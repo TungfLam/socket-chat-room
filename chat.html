@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Room</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+</head>
+
+<body>
+    <h2>🔹 Chat Room</h2>
+
+    <label>Nhập phòng: </label>
+    <input id="roomInput" type="text" placeholder="Nhập tên phòng...">
+    <button onclick="joinRoom()">Tham gia</button>
+    <button onclick="leaveRoom()">Rời phòng</button>
+
+    <h3>📜 Danh sách phòng hiện tại:</h3>
+    <ul id="roomList" style="list-style-type: none; padding: 0;"></ul>
+
+
+    <h3>💬 Tin nhắn trong phòng: <span id="roomName"></span></h3>
+    <div id="messages" style="border: 1px solid #ccc; height: 200px; overflow-y: auto; padding: 10px;"></div>
+
+    <input id="messageInput" type="text" placeholder="Nhập tin nhắn...">
+    <button onclick="sendMessage()">Gửi</button>
+
+    <script>
+        const socket = io("http://192.168.0.59:3000");
+        let currentRoom = "";
+
+        // Tự động gửi yêu cầu kiểm tra phòng khi reload
+        socket.emit("reload-request");
+
+        socket.on("reload-response", (room) => {
+            if (room) {
+                currentRoom = room;
+                document.getElementById("roomName").innerText = room;
+                console.log(`🔄 Đã tham gia lại phòng: ${room}`);
+            }
+        });
+
+
+        // Cập nhật danh sách phòng
+        socket.on("room-list", (rooms) => {
+            const roomList = document.getElementById("roomList");
+            roomList.innerHTML = "";
+
+            rooms.forEach((room) => {
+                const listItem = document.createElement("li");
+                listItem.innerHTML = `🏠 ${room.name} - 👥 ${room.userCount} người`;
+                roomList.appendChild(listItem);
+            });
+        });
+
+
+        // Nhận phản hồi từ server sau khi gửi yêu cầu tham gia phòng
+        socket.on("join-room-response", (data) => {
+            if (data.status === 1) {
+                // Tham gia phòng thành công
+                currentRoom = document.getElementById("roomInput").value;
+                document.getElementById("roomName").innerText = currentRoom;
+                // alert(data.message);  // ✅ Thông báo thành công
+            } else {
+                // Tham gia phòng thất bại
+                alert(data.message);  // ❌ Thông báo lỗi
+            }
+        });
+
+
+        // Nhận tin nhắn chat
+        socket.on("chat-message", (data) => {
+            const msgContainer = document.getElementById("messages");
+            msgContainer.innerHTML += `<p><strong>${data.sender}:</strong> ${data.message}</p>`;
+            msgContainer.scrollTop = msgContainer.scrollHeight;
+        });
+
+        // Nhận thông báo
+        socket.on("message", (msg) => {
+            const msgContainer = document.getElementById("messages");
+            msgContainer.innerHTML += `<p><em>${msg}</em></p>`;
+            msgContainer.scrollTop = msgContainer.scrollHeight;
+        });
+
+        // Cập nhật danh sách phòng và số người
+        socket.on("room-list", (rooms) => {
+            const roomListContainer = document.getElementById("roomList");
+            roomListContainer.innerHTML = "";
+
+            // Hiển thị danh sách phòng và số người
+            rooms.forEach((room) => {
+                const listItem = document.createElement("li");
+                listItem.innerHTML = `🏠 ${room.name} - 👥 ${room.userCount} người`;
+                roomListContainer.appendChild(listItem);
+            });
+        });
+
+    </script>
+
+    <script>
+        // Hàm cập nhật UI danh sách phòng
+        function updateRoomListUI(rooms) {
+            const roomListContainer = document.getElementById("roomList");
+            roomListContainer.innerHTML = ""; // Xóa danh sách hiện tại
+
+            // Hiển thị danh sách phòng mới
+            rooms.forEach((room) => {
+                const listItem = document.createElement("li");
+                listItem.innerText = room;
+                roomListContainer.appendChild(listItem);
+            });
+        }
+
+        // Hàm rời phòng
+        function leaveRoom() {
+            if (currentRoom) {
+                socket.emit("leave-room", currentRoom);
+                currentRoom = "";
+                document.getElementById("roomName").innerText = "";
+                document.getElementById("messages").innerHTML = "";
+            }
+        }
+
+        // Hàm gửi tin nhắn
+        function sendMessage() {
+            const message = document.getElementById("messageInput").value;
+            if (message && currentRoom) {
+                socket.emit("chat-message", { room: currentRoom, message });
+                document.getElementById("messageInput").value = "";
+            }
+        }
+
+        // Hàm tham gia phòng
+        function joinRoom() {
+            const room = document.getElementById("roomInput").value;
+            if (room) {
+                socket.emit("join-room", room);
+            }
+        }
+
+
+    </script>
+</body>
+
+</html>
